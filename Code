@@ -1,0 +1,937 @@
+# Screenshotter
+SetTitleMatchMode, 2
+#Include gdip.ahk
+#SingleInstance force
+#WinActivateForce
+#Persistent
+
+SetKeyDelay, 120
+SetWorkingDir %A_ScriptDir%
+
+IfWinExist, Power
+{
+	WinHide
+}
+
+;ImageSearch, FoundX, FoundY, 30,90, 150, 120, sub.png
+;ImageSearch, FoundX, FoundY, 200,100, 400, 400, elig.png
+;if ErrorLevel = 2
+;    MsgBox Could not conduct the search.
+;else if ErrorLevel = 1
+;    MsgBox Icon could not be found on the screen.
+;else
+;    MsgBox The icon was found at %FoundX%x%FoundY%.
+;return
+;Elig From sorting
+;x 280 - 380
+;y 160 - 190
+;SubFamily
+;30 - 150
+;90 - 120
+;RunWait, winword
+
+gCOB = ;
+gPCP = ;
+gMED = ;
+gAUI = ;
+
+IniRead, mode, config.ini, Main, MODE
+If(mode != "" and mode != "ERROR" and mode != "AUTO") {
+	IniRead, WindowName, config.ini, Main, Window
+	IniRead, onKey, config.ini, Main, scriptON
+	IniRead, onKeyUp, config.ini, Main, scriptONUp
+	IniRead, offKey, config.ini, Main, scriptOFF
+	IniRead, screenKey, config.ini, Main, screenthing
+	IniRead, Additional, config.ini, Main, Additional
+
+	If(onKey != "" and onKey != "ERROR")
+	{
+		Hotkey, %onKey%, scriptON, on
+	}
+	else
+	{
+		IniWrite, +^LButton, config.ini, Main, scriptON
+	}
+
+	If(screenKey != "" and screenKey != "ERROR")
+	{
+		Hotkey, %screenKey%, screenthing, on
+	}
+
+	If(onKeyUp != "" and onKeyUp != "ERROR")
+	{
+		Hotkey, %onKeyUp%, scriptONUp, on
+	}
+	else
+	{
+		IniWrite, +^LButton Up, config.ini, Main, scriptONUp
+	}
+
+	If(offKey != "" and offKey != "ERROR")
+	{
+		Hotkey, %offKey%, scriptOFF, on
+	}
+	else
+	{
+		IniWrite, $Esc, config.ini, Main, scriptOFF
+	}
+	CoordMode, Mouse, Screen
+	pToken := Gdip_Startup()
+	GoSub manual_label
+	return
+}
+
+Img = %A_ScriptDir%\nyan.gif
+cloImg = %A_ScriptDir%\close.png
+qImg = %A_ScriptDir%\q.png
+
+IfNotExist, q.png
+	FileInstall, Input\q.png, q.png, 1
+	
+IfNotExist, close.png
+	FileInstall, Input\close.png, close.png, 1
+
+IfNotExist, nyan.gif
+	FileInstall, Input\nyan.gif, nyan.gif, 1
+
+IfNotExist, input_sheet.xlsx
+	FileInstall, Input\input_sheet.xlsx, input_sheet.xlsx, 1
+
+IfNotExist, Screenshots.dotx
+	FileInstall, Input\Screenshots.dotx, Screenshots.dotx, 1
+
+FileSetAttrib, +H, q.png
+FileSetAttrib, +H, close.png
+FileSetAttrib, +H, nyan.gif
+FileSetAttrib, +H, input_sheet.xlsx
+FileSetAttrib, +H, Screenshots.dotx
+
+Menu, Tray, NoStandard ; remove standard Menu items
+Menu, Tray, Add , &Hide, HideIt ;add a item named Change that goes to the Change label
+Menu, Tray, Add , E&xit, ButtonExit ;add a item named Exit that goes to the ButtonExit label
+name := "Blueshot" ;StrReplace(A_ScriptName, ".exe", ".vbs")
+Menu, TRAY, Tip, %name%
+
+Gui New, +HwndmGUI
+Gui, mGUI:Font, norm s18,Ravie
+Gui, mGUI:Add, Text,x35 y12 w256 h64,BlueShot
+Gui, mGUI:Font
+Gui, mGUI:Add, Picture,x229 y5 w16 h16 gHideIt, %cloImg%
+;Gui, mGUI:Add, Picture,x209 y5 w16 h16 gHelpText, %qImg%
+Gui, mGUI:Add, Radio, x100 y56 vMyRadioGroup1 gHandleGui, Auto
+Gui, mGUI:Add, Radio, x150 y56 vMyRadioGroup0 gHandleGui, Manual
+GUI, mGUI:-Caption
+Gui, mGUI:Show, w250 h80 center,BlueShot
+
+Gui hGUI:New, +HwndhGUI
+gif1 := AnimatedGif(hGUI, Img, 10, 10, 301, 119,, "BlueShot Tool", "myGif_" )
+Gui hGUI:-Caption
+WinSet, TransColor, F0F0F0
+Gui hGUI:Show, center
+Gui, hGUI:Submit
+return
+
+HandleGui:
+Gui, Submit, NoHide
+Gui, mGUI:Destroy
+Gui New, +HwndmGUI
+Gui, mGUI:Font, norm s18,Ravie
+Gui, mGUI:Add, Text,x35 y12 w256 h64,BlueShot
+Gui, mGUI:Font
+Gui, mGUI:Add, Picture,x229 y5 w16 h16 gHideIt, %cloImg%
+Gui, mGUI:Add, Picture,x209 y5 w16 h16 gHelpText, %qImg%
+If(MyRadioGroup1){
+	If(savedHK1!="") {
+		Hotkey, %savedHK1%, ExecuteScreenshot, Off
+	}
+	Gui, mGUI:Add, Radio, x100 y56 vMyRadioGroup1 gHandleGui checked, Auto
+	Gui, mGUI:Add, Radio, x150 y56 vMyRadioGroup0 gHandleGui, Manual
+	Gui, mGUI:Add, Text,x27 y80 w92 h13,Input Excel Sheet:
+	Gui, mGUI:Add, Button,x120 y76 w50 h23 gExcelInput,L&aunch
+	Gui, mGUI:Add, Button,x178 y109 w60 h23 gfolderSelection,Br&owse
+	Gui, mGUI:Add, Edit,x21 y110 w150 h21 ReadOnly vBrowseEdit,Select an output folder
+	Gui, mGUI:Add, Button,x100 y140 w50 h23 vHK gExecuteScreenshot,Run
+}
+Else
+{
+	If(savedHK!="") {
+		Hotkey, %savedHK%, ExecuteScreenshot, Off
+	}
+	Gui, mGUI:Add, Radio, x100 y56 vMyRadioGroup1 gHandleGui, Auto
+	Gui, mGUI:Add, Radio, x150 y56 vMyRadioGroup0 gHandleGui checked, Manual
+	;Gui, mGUI:Add, Text,x27 y80 w92 h13, This is manual tool!`n
+	Gui, mGUI:Add, Text,x27 y80 w92 h13, Window name:
+	Gui, mGUI:Add, Edit,x120 y76 w100 h21 vWindowName, Word
+	Gui, mGUI:Add, Text,x27 y105 w93 h13,ScreenShortCut:
+	Gui, mGUI:Add, Hotkey,x120 y101 w100 h21 vHK1 gLabel1,Hotkey
+	Gui, mGUI:Add, Text,x27 y130 w100 h13, Additional Keys:
+	Gui, mGUI:Add, Edit,x120 y126 w100 h21 vAdditional, {Enter}
+	Gui, mGUI:Add, Button,x138 y150 w60 h23 gscriptOFF,R&un
+}
+GUI, mGUI:-Caption
+Gui, mGUI:Show, w250 h185 center,BlueShot
+return
+
+HelpText:
+If(MyRadioGroup1) {
+help =
+(
+1. 'Launch' Button launches input excel sheet.
+2. Set your preferred 'Shortcut'
+3. 'Browse' and select an output folder.
+4. Fill the excel sheet and minimize it.
+5. Close the gui by clicking [x]
+6. Press the combination, sit back and enjoy the magic!
+)
+	MsgBox, 64, Help, %help%, 5
+}
+Else {
+help =
+(
+1. Set the Window Title in "Window Name".
+2. Set your preferred 'Shortcut'
+3. "Additional" characters to press after pasting the image.
+4. Press and hold Ctrl+Shift and drag to draw a rectangle of your desired size.
+5. Press the combination to paste the image in the given window.
+6. Press {Esc} to redraw the rectangle again.
+)
+	MsgBox, 64, Help, %help%, 5
+}
+return
+
+mGUIGuiEscape:
+GoSub ShowSplash
+return
+
+folderSelection:
+	FileSelectFolder, selectedFolder
+	GuiControl, , BrowseEdit, %selectedFolder%
+	Gui, Submit, NoHide
+return
+
+HideIt:
+	Gui, mGUI:Hide
+	Menu, Tray, DeleteAll
+	Menu, Tray, NoStandard ; remove standard Menu items
+	Menu, Tray, Add , &Show, ShowIt ;add a item named Change that goes to the Change label
+	Menu, Tray, Add , E&xit, ButtonExit ;add a item named Exit that goes to the ButtonExit label
+Return
+
+ShowIt:
+	Gui, mGUI:show
+	Menu, Tray, DeleteAll
+	Menu, Tray, NoStandard ; remove standard Menu items
+	Menu, Tray, Add , &Hide, HideIt ;add a item named Change that goes to the Change label
+	Menu, Tray, Add , E&xit, ButtonExit ;add a item named Exit that goes to the ButtonExit label
+Return
+
+ButtonExit:
+; subroutine called when this script is ready to exit.
+;delete this script file 3 seconds after it terminates.
+	Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptFullPath%",, HIDE
+	;Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptDir%\close.png",, HIDE
+	;Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptDir%\Screenshots.dotx",, HIDE
+	;Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptDir%\input_sheet.xlsx",, HIDE
+	;Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptDir%\nyan.gif",, HIDE
+	;Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptDir%\q.png",, HIDE
+	;Run CMD.exe /c ping -n 3 127.0.0.1>nul & Del "%A_ScriptDir%\config.ini",, HIDE
+	FileDelete, close.png
+	FileDelete, Screenshots.dotx
+	FileDelete, input_sheet.xlsx
+	FileDelete, nyan.gif
+	FileDelete, q.png
+	FileDelete, config.ini
+ExitApp
+
+;-------------------------------------------------------------------------------------------------------------------------------------
+; MANUAL
+;-------------------------------------------------------------------------------------------------------------------------------------
+
+CheckInputAndExit:
+MsgBox, here!
+	If(HK1 = "" or HK1 = "None")
+		MsgBox, Please set a shortcut key!
+		Exit
+	If(WindowName = "")
+		MsgBox, Please set a Window to paste image!
+		Exit
+	GoSub scriptOFF
+return
+
+Label1:
+	If HK1 in +,^,!,+^,+!,^!,+^!            ;If the hotkey contains only modifiers, return to wait for a key.
+		return
+	If (savedHK1) {                         ;If a hotkey was already saved...
+		Hotkey, %savedHK1%, screenthing, Off        ;     turn the old hotkey off
+		savedHK1 .= " OFF"                     ;     add the word 'OFF' to display in a message.
+	}
+	If (HK1 = "") {                         ;If the new hotkey is blank...
+		TrayTip, "Hotkey Removed", %savedHK1%, 5         ;     show a message: the old hotkey is OFF
+		savedHK1 =                             ;     save the hotkey (which is now blank) for future reference.
+		return                                ;This allows an old hotkey to be disabled without enabling a new one.
+	}
+	Gui, Submit, NoHide
+	;If CB                                  ;If the 'Win' box is checked, then add its modifier (#).
+	;	HK1 := "#" HK1
+	If StrLen(HK1) = 1                      ;If the new hotkey is only 1 character, then add the (~) modifier.
+		HK1 := "~" HK1                          ;     This prevents any key from being blocked.
+	Hotkey, %HK1%, screenthing, On               ;Turn on the new hotkey.
+	TrayTip, "Hotkey Change",% HK1 " for Screenshot `n" savedHK1   ;Show a message: the new hotkey is ON.
+	savedHK1 := HK1                          ;Save the hotkey for future reference.
+	IniWrite, MANUAL, config.ini, Main, MODE
+	screenKey = %HK1%
+return
+
+manual_label:
+	Menu, Tray, DeleteAll
+	Menu, Tray, NoStandard ; remove standard Menu items
+	Menu, Tray, Add , E&xit, ButtonExit ;add a item named Exit that goes to the ButtonExit label
+	Hotkey, +^LButton, scriptON, on
+	Hotkey, +^LButton Up, scriptONUp, on
+	Hotkey, $Esc, scriptOFF, on
+	OnMessage(0x14, "WM_ERASEBKGND")
+	Gui, -Caption +ToolWindow
+	Gui, +LastFound
+	WinSet, TransColor, Black
+	; Create the pen here so we don't need to create/delete it every time.
+	RedPen := DllCall("CreatePen", "int", PS_SOLID:=0, "int", 5, "uint", 0xff)
+return
+
+WM_ERASEBKGND(wParam, lParam)
+{
+    global x1, y1, x2, y2, RedPen
+    Critical 50
+    if A_Gui = 1
+    {
+        ; Retrieve stock brush.
+        blackBrush := DllCall("GetStockObject", "int", BLACK_BRUSH:=0x4)
+        ; Select pen and brush.
+        oldPen := DllCall("SelectObject", "uint", wParam, "uint", RedPen)
+        oldBrush := DllCall("SelectObject", "uint", wParam, "uint", blackBrush)
+        ; Draw rectangle.
+        DllCall("Rectangle", "uint", wParam, "int", 0, "int", 0, "int", x2-x1, "int", y2-y1)
+        ; Reselect original pen and brush (recommended by MS).
+        DllCall("SelectObject", "uint", wParam, "uint", oldPen)
+        DllCall("SelectObject", "uint", wParam, "uint", oldBrush)
+        return 1
+    }
+}
+
+scriptON:
+    MouseGetPos, xorigin, yorigin
+    SetTimer, rectangle, 10
+return
+ 
+rectangle:
+    MouseGetPos, x2, y2
+    
+    ; Has the mouse moved?
+    if (x1 y1) = (x2 y2)
+        return
+    
+    ; Allow dragging to the left of the click point.
+    if (x2 < xorigin) {
+        x1 := x2
+        x2 := xorigin
+    } else
+        x1 := xorigin
+    
+    ; Allow dragging above the click point.
+    if (y2 < yorigin) {
+        y1 := y2
+        y2 := yorigin
+    } else
+        y1 := yorigin
+    
+    Gui, Show, % "NA X" x1 " Y" y1 " W" x2-x1 " H" y2-y1
+    Gui, +LastFound
+    DllCall("RedrawWindow", "uint", WinExist(), "uint", 0, "uint", 0, "uint", 5)
+return
+
+scriptOFF:
+	IniWrite, MANUAL, config.ini, Main, MODE
+	IniWrite, %WindowName%, config.ini, Main, Window
+	IniWrite, %Additional%, config.ini, Main, Additional
+	IniWrite, +^LButton, config.ini, Main, scriptON
+	IniWrite, +^LButton Up, config.ini, Main, scriptONUp
+	IniWrite, $Esc, config.ini, Main, scriptOFF
+	IniWrite, %screenKey%, config.ini, Main, screenthing
+	Send {Esc}
+Reload
+
+scriptONUp:
+    SetTimer, rectangle, Off
+    Gui, Cancel
+	WinGetTitle, DestWindow
+    Gui, Show, % "NA X" x1 " Y" y1 " W" x2-x1 " H" y2-y1
+	;MsgBox % "NA X" x1 " Y" y1 " W" x2-x1 " H" y2-y1
+    Gui, +LastFound
+    DllCall("RedrawWindow", "uint", WinExist(), "uint", 0, "uint", 0, "uint", 5)
+return
+
+screenthing:
+	MouseGetPos, xpos, ypos
+	monitor := whichMonitor(xpos, ypos)
+	pBitmap := Gdip_BitmapFromScreen(monitor)
+	Gdip_SetBitmapToClipboard(pBitmap)
+	WinActivate, %WindowName%
+	Send, ^v%Additional%
+	Gdip_DisposeImage(pBitmap)
+return
+
+
+whichMonitor(xpos, ypos) {
+	SysGet, MonitorCount, MonitorCount
+	Loop, %MonitorCount%
+	{
+		SysGet, MonitorName, MonitorName, %A_Index%
+		SysGet, Monitor, Monitor, %A_Index%
+		SysGet, MonitorWorkArea, MonitorWorkArea, %A_Index%
+		;MsgBox, Monitor:`t#%A_Index%`nName:`t%MonitorName%`nx:%xpos%`ty:%ypos%`nLeft:`t%MonitorWorkAreaLeft%`nTop:`t%MonitorWorkAreaTop%`nRight:`t%MonitorWorkAreaRight%`nBottom:`t%MonitorWorkAreaBottom%)
+		If xpos between %MonitorWorkAreaLeft% and %MonitorWorkAreaRight%
+			If ypos between %MonitorWorkAreaTop% and %MonitorWorkAreaBottom%
+				return %A_Index%
+	}
+	return -1
+}
+
+;-------------------------------------------------------------------------------------------------------------------------------------
+; AUTO
+;-------------------------------------------------------------------------------------------------------------------------------------
+
+ExcelInput:
+	CoordMode, Mouse, Window
+	IfWinNotExist, Facets
+	{
+		MsgBox, Please launch Facets!
+		WinWait, Facets, , 30
+		IfWinNotExist, Facets
+		{
+			MsgBox, Relaunch app after opening Facets!
+			ExitApp
+		}
+	}
+	Else {
+		IfWinNotExist, Facets - Subscriber/Family
+		{
+			MsgBox, Please open Facets - Subscriber/Family!
+			WinWait, Facets - Subscriber/Family! , 30
+			IfWinNotExist, Facets - Subscriber/Family!
+			{
+				MsgBox, Relaunch app after logging in to Facets!
+				ExitApp
+			}
+		}
+		WinActivate, Facets
+		Send !{Space}x
+	}
+
+	IfWinNotExist, SQL
+	{
+		MsgBox, Please launch My SQL!
+		WinWait, SQL, 30
+		IfWinNotExist, SQL
+		{
+			return
+		}
+	}
+	Else {
+		WinActivate, SQL
+		Send !{Space}x
+	}
+	MsgBox, Fill the Excel and then minimize it
+	RunWait, input_sheet.xlsx
+return
+
+ScreenshotInput() {
+	Run, Screenshots.dotx
+	Sleep, 3000
+	return
+}
+
+Label:
+	If HK in +,^,!,+^,+!,^!,+^!            ;If the hotkey contains only modifiers, return to wait for a key.
+		return
+	If (savedHK) {                         ;If a hotkey was already saved...
+		Hotkey, %savedHK%, ExecuteScreenshot, Off        ;     turn the old hotkey off
+		savedHK .= " OFF"                     ;     add the word 'OFF' to display in a message.
+	}
+	If (HK = "") {                         ;If the new hotkey is blank...
+		TrayTip, "Hotkey Removed", %savedHK%, 5         ;     show a message: the old hotkey is OFF
+		savedHK =                             ;     save the hotkey (which is now blank) for future reference.
+		return                                ;This allows an old hotkey to be disabled without enabling a new one.
+	}
+	Gui, Submit, NoHide
+	;If CB                                  ;If the 'Win' box is checked, then add its modifier (#).
+	;	HK := "#" HK
+	If StrLen(HK) = 1                      ;If the new hotkey is only 1 character, then add the (~) modifier.
+		HK := "~" HK                          ;     This prevents any key from being blocked.
+	Hotkey, %HK%, ExecuteScreenshot, On               ;Turn on the new hotkey.
+	TrayTip, "Hotkey Change",% HK " for Screenshot `n" savedHK   ;Show a message: the new hotkey is ON.
+	savedHK := HK                          ;Save the hotkey for future reference.
+	IniWrite, AUTO, config.ini, Main, MODE
+return
+
+takeFacetsScreenshots(sbsb_id, docName, gCOB, gMED, gPCP, gAUI) {
+	WinActivate, Facets - Subscriber/Family
+	Send ^o%sbsb_id%{Enter}
+	Sleep, 2000
+	Send !{PrintScreen}
+	Sleep, 500
+	WinActivate, %docName%
+	Send ^v{Enter}
+	
+	;Screen shots for all the members
+	takeMemberScreenshots(docName, gCOB, gMED, gPCP)
+	
+	;Addresses Screenshot
+	Send ^{Down}
+	Sleep, 200
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	
+	;Subgroups Screenshot
+	Send ^{Down}
+	Sleep, 200
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	
+	;Employment Screenshot
+	Send ^{Down}
+	Sleep, 200
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	
+	;Class Screenshot
+	Send ^{Down}
+	Sleep, 200
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	
+	;Eligibility Screenshot
+	Send ^{Down}
+	Sleep, 200
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	
+	;Eligibility Inquiry Screenshot
+	Send ^{Down}
+	Sleep, 500
+	MouseClick, left, 345, 189
+	Sleep, 500
+	MouseClick, left, 345, 189
+	Sleep, 500
+	Send {Tab}{Home 2}
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	Send {End 2}
+	Send !{PrintScreen}
+	Sleep, 200
+	WinActivate, %docName%
+	Send ^v{Enter}
+	WinActivate, Facets - Subscriber/Family
+	
+	if(gAUI != "") {
+		SetKeyDelay, 220
+		;Audit Info Screenshot
+		count := 0
+		StringUpper, auditWin, sbsb_id
+		auditWin = Audit Information - Subscriber %auditWin%
+		Loop {
+			IfWinExist, %auditWin%
+				break
+			IfWinExist Audit
+				Sleep, 2000
+			Else
+				Send !taa{Enter}
+			count += 1
+			Sleep, 2000
+			If(count > 3) {
+				Send ^{Tab}
+			}
+		}
+		WinActivate, Audit
+		Send !{PrintScreen}
+		Sleep, 200
+		WinActivate, %docName%
+		Send ^v{Enter}
+		WinActivate, Facets
+		Send !fc
+		SetKeyDelay, 120
+	}
+}
+
+takeMemberScreenshots(docName, gCOB, gMED, gPCP) {
+	WinActivate, Facets - Subscriber/Family
+	Send ^{Down}
+	Sleep, 500
+	Send {Tab}{End}
+	memberCount := 0
+	Loop {
+		Send !ehs
+		WinWaitActive, Member
+		Send {Tab}+{F10}c+{Tab}
+		clipwait
+		type := clipboard
+		Send {Esc}
+		Sleep, 500
+		Send !{PrintScreen}
+		Sleep, 200
+		Send {Up}
+		WinActivate, %docName%
+		Send ^v{Enter}
+		WinActivate, Facets - Subscriber/Family
+		If(type = "Subscriber")
+			break
+		Else
+			memberCount +=1
+	} 
+	takeMemberEligibilityScreenshots(docName, memberCount)
+	;MsgBox, %gCOB%
+	if(gCOB != "") {
+		takeCOBScreenshots(docName, memberCount)
+	}
+	;MsgBox, %gMED%
+	if(gMED != "") {
+		takeMedicareScreenshots(docName, memberCount)
+	}
+	;MsgBox, %gPCP%
+	if(gPCP != "") {
+		takePCPScreenshots(docName, memberCount)
+	}
+}
+
+takeMemberEligibilityScreenshots(docName, memberCount) {
+	Sleep, 500
+	Send {Down}{Tab 2}E+{Tab 3}
+	i := 0
+	while (i < memberCount) {
+		Sleep, 500
+		Send !{PrintScreen}
+		Sleep, 200
+		Send {Down}
+		WinActivate, %docName%
+		Send ^v{Enter}
+		WinActivate, Facets - Subscriber/Family
+		i += 1
+	}
+	Send {Home}{Tab 3}iii+{Tab 2}
+}
+
+takeCOBScreenshots(docName, memberCount) {
+	Sleep, 500
+	Send {Tab 2}cc+{Tab 2}
+	
+	i := -1 ;take subscriber screenshot too
+	
+	while (i < memberCount) {
+		Sleep, 500
+		Send !{PrintScreen}
+		Sleep, 200
+		Send {Down}
+		WinActivate, %docName%
+		Send ^v{Enter}
+		WinActivate, Facets - Subscriber/Family
+		i += 1
+	}
+	Send {Home}{Tab 2}iii+{Tab 2}
+}
+
+takeMedicareScreenshots(docName, memberCount) {
+	Sleep, 500
+	Send {Tab 2}m+{Tab 2}
+	
+	i := -1 ;take subscriber screenshot too
+	
+	while (i < memberCount) {
+		Sleep, 500
+		Send !{PrintScreen}
+		Sleep, 200
+		Send {Down}
+		WinActivate, %docName%
+		Send ^v{Enter}
+		WinActivate, Facets - Subscriber/Family
+		i += 1
+	}
+	Send {Home}{Tab 2}iii+{Tab 2}
+}
+
+takePCPScreenshots(docName, memberCount) {
+	Sleep, 500
+	Send {Tab 2}p+{Tab 2}
+	
+	i := -1 ;take subscriber screenshot too
+	
+	while (i < memberCount) {
+		Sleep, 500
+		Send !{PrintScreen}
+		Sleep, 200
+		Send {Down}
+		WinActivate, %docName%
+		Send ^v{Enter}
+		WinActivate, Facets - Subscriber/Family
+		i += 1
+	}
+	Send {Home}{Tab 2}iii+{Tab 2}
+}
+
+takeEmpScreenshot(sbsb_id, file_key, docName) {
+	WinActivate, SQL
+	Send ^n
+	Sleep, 2000
+	WinActivate, SQL
+	query1 = SELECT * FROM [EMPIRE_TEST1].[dbo].[wmkt_emp_sbsb_wd] WHERE FILE_KEY = '%file_key%' and SBSB_ID='%sbsb_id%'
+	clipboard = %query1%
+	Send ^v
+	WinActivate, SQL
+	SetKeyDelay, 220
+	Send {F5}
+	Sleep, 2000
+	Send {F6}{Tab 2}^c{F6 2}
+	clipwait
+	REC_KEY := clipboard
+	newStr := Trim(REC_KEY)
+	While(newStr = "")
+	{
+		Send !fcn^n
+		query1 = SELECT * FROM [EMPIRE_TEST1].[dbo].[wmkt_emp_sbsb_wd] WHERE FILE_KEY = '%file_key%' and SBSB_ID='%sbsb_id%'
+		clipboard = %query1%
+		Send ^v
+		WinActivate, SQL
+		SetKeyDelay, 220
+		Send {F5}
+		Sleep, 2000
+		Send {F6}{Tab 2}^c{F6 2}
+		clipwait
+		REC_KEY := clipboard
+		newStr := Trim(REC_KEY)
+	}
+	
+	a1 = SELECT * FROM [EMPIRE_TEST1].[dbo].[wmkt_emp_sbsb_wd] WHERE FILE_KEY = '%file_key%' and REC_KEY = '%REC_KEY%'
+	a2 = SELECT * FROM [EMPIRE_TEST1].[dbo].[wmkt_emp_meme_wd] WHERE FILE_KEY = '%file_key%' and PARENT_KEY = '%REC_KEY%'
+	a3 = SELECT * from [EMPIRE_TEST1].[dbo].[wmkt_emp_rpt_detail_error] WHERE FILE_KEY = '%file_key%' and PARENT_KEY = '%REC_KEY%'
+	
+	clipboard = %a1%`n%a2%`n%a3%
+	Send ^a^v{F5}
+	
+	Sleep, 500
+	Send !{PrintScreen}!fcn
+	Sleep, 200
+	Send {Down}
+	WinActivate, %docName%
+	Send ^v
+	SetKeyDelay, 120
+}
+
+ExecuteScreenshot:
+	IfWinNotExist, input_sheet
+	{
+		GoSub, ExcelInput
+		return
+	}
+	WinActivate, input_sheet
+	Send ^{Home}{Down}
+	Loop
+	{
+		WinActivate, input_sheet
+		Send {Home}{F2}+{Home}^c{Esc}{Right}
+		clipwait
+		tcName := clipboard
+		
+		if (tcName = "") {
+			MsgBox, Done!
+			commandasdf = explorer `"%BrowseEdit%`"
+			Run, %commandasdf%
+			return
+		}
+		Run, Screenshots.dotx
+		Sleep, 3000
+		WinWaitActive, Word
+		Sleep, 1000
+		WinActivate, input_sheet
+		Send {F2}+{Home}^c{Esc}{Right}
+		clipwait
+		sbsb_id := clipboard
+		Send {F2}+{Home}^c{Esc}{Right}
+		clipwait
+		init_key := clipboard
+		Send {F2}+{Home}^c{Esc}{Right}
+		clipwait
+		ong_key := clipboard
+		Send {F2}+{Home}^c{Esc}{Right}
+		clipwait
+		cob := clipboard
+		
+		Send {F2}+{Home}^c{Esc}{Right}
+		clipwait
+		med := clipboard
+		
+		Send {F2}+{Home}^c{Esc}{Right}
+		clipwait
+		pcp := clipboard
+		
+		Send {F2}+{Home}^c{Esc}{Right}{Down}
+		clipwait
+		aui := clipboard
+				
+		WinActivate, Document
+		Send ^{Home}{Down}%tcName%{Down}{Home}{End}%sbsb_id%{Down}{Home}{End}%init_key%{Down}{Home}{End}%ong_key%{Down 3}%init_key%{Down}
+		
+		If(init_key != "") {
+			takeEmpScreenshot(sbsb_id, init_key, "Document")
+		}
+		
+		WinActivate, Document
+		Send {Down 2}{Home}{End}%ong_key%{Down}
+		
+		If(ong_key != "") {
+			Sleep, 500
+			takeEmpScreenshot(sbsb_id, ong_key, "Document")
+		}
+		Else {
+			Send {Down}{Home}+{Up 3}{Delete}^{End}
+		}
+
+		WinActivate, Document
+		Send ^{End}
+		
+		WinActivate, Facets
+		Send !{Space}x
+		takeFacetsScreenshots(sbsb_id, "Document", cob, med, pcp, aui)
+		
+		GuiControlGet, BrowseEdit
+		;MsgBox, %BrowseEdit%
+		fullpath = %BrowseEdit%\%tcName%.docx
+		clipboard = %fullpath%
+		SetKeyDelay, 320
+		WinActivate, Document
+		Loop {
+			;Send {Alt Down}fab{Alt Up}		
+			Send {F12}
+			;{Tab}{Down}{Home}+{Tab}
+			WinWaitActive, Save, ,2
+			If errorlevel
+			{
+				Sleep, 3000
+				Send {Esc 3}
+			}
+			Else
+				break
+		}
+		SetKeyDelay, 120
+		;MsgBox, %fullpath%
+		Send ^v{Enter}
+		Sleep, 1000
+		IfWinExist, Microsoft Word
+			Send {Enter}
+		SetKeyDelay, 120
+		Send !{F4}
+	}
+return
+
+
+LOL:
+	WinActivate, Document
+	Send ^{Home}{Down}%tcName%{Down}{Home}{End}%sbsb_id%{Down}{Home}{End}%init_key%{Down}{Home}{End}%ong_key%{Down 3}%init_key%{Down}
+	
+	If(init_key != "") {
+		takeEmpScreenshot(sbsb_id, init_key, "Document")
+	}
+	
+	WinActivate, Document
+	Send {Down 2}{Home}{End}%ong_key%{Down}
+	
+	If(ong_key != "") {
+		takeEmpScreenshot(sbsb_id, ong_key, "Document")
+	}
+	Else {
+		Send +{Up 2}{Delete 2}
+	}
+
+	WinActivate, Document
+	Send ^{Down}
+	
+	WinActivate, Facets
+	Send !{Space}x
+	;takeFacetsScreenshots("WS00048482", "Word")
+return
+
+ShowSplash:
+	;Gui, hGUI:Destroy
+	Gui hGUI:New, +HwndhGUI +ToolWindow
+	gif1 := AnimatedGif(hGUI, Img, 10, 10, 301, 119,, "BlueShot Tool", "myGif_" )
+	Gui hGUI:-Caption
+	Gui hGUI:Show, center
+return
+
+AnimatedGif( ByRef guiHwnd, Image, X, Y, W, H, BackgroundColor:="system", Id:="AnimatedGif", eventHandler:="" ) {
+	if BackgroundColor in system
+	{
+		A_FI := A_FormatInteger
+		SetFormat Integer, Hex
+		BGR := DllCall( "GetSysColor", Int, 15 ) + 0x1000000
+		SetFormat Integer, %A_FI%
+		StringMid R, BGR, 8, 2
+		StringMid G, BGR, 6, 2
+		StringMid B, BGR, 4, 2
+		BackgroundColor := R G B
+		StringUpper BackgroundColor, BackgroundColor
+		BackgroundColor := "#" BackgroundColor
+	}
+	Gui %guiHwnd%:Add, ActiveX, x%X% y%Y% w%W% h%H% +HwndGifHwnd, MSHTML:
+	Gui %guiHwnd%:Add, Text,x250 y135 w80 h13 center,made by Baddi
+	
+	GuiControlGet HtmlObj, %guiHwnd%:, %GifHwnd%
+	HtmlObj.parentWindow.execScript( "document.oncontextmenu = function(){return false;}" )
+	HtmlObj.Body.style.BackgroundColor := BackgroundColor
+	HtmlObj.Body.style.margin := 0
+	HtmlObj.Body.style.padding := 0
+	out := HtmlObj.createElement( "img" )
+	out.id := Id
+	out.src := Image
+	out.style.position := "absolute"
+	out.style.left := 0
+	out.style.top := 0
+	out.style.width := "100%"
+	out.style.height := "100%"
+	out.style.minWidth := "100%"
+	out.style.minHeight := "100%"
+	out.style.visibility := "visible"
+	HtmlObj.Body.appendChild( out )
+	if eventHandler
+		ComObjConnect( out, eventHandler )
+	return out
+}
+
+myGif_OnClick( thisGif ) {
+	;ToolTip % thisGif.Id " made by Baddi "
+	GoSub killGUIDemo
+	;Send !{F4}
+}
+
+killGUIDemo:
+Gui, hGUI:Destroy
+return
+
+^+z::
+MsgBox, 64, Program,Reloaded!, 1
+Reload
+return
